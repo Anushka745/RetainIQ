@@ -53,7 +53,14 @@ def on_startup():
     init_db()
     logger.info("Database initialized.")
 
-
+    # Auto-seed on first run (e.g. on platforms without shell access like
+    # Railway's free tier). Safe to run on every startup: seed.py itself
+    # checks for existing data and skips re-seeding if records already exist.
+    try:
+        from seed import seed
+        seed()
+    except Exception as exc:
+        logger.error("Auto-seed failed (non-fatal, app will continue): %s", exc)
 # ---------------------------------------------------------------------------
 # Global error handlers
 # ---------------------------------------------------------------------------
