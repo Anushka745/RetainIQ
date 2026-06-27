@@ -32,7 +32,7 @@ def get_churn_predictions(
     if not end_users:
         return schemas.ChurnSummary(high_risk_count=0, medium_risk_count=0, low_risk_count=0, predictions=[])
 
-    df, accuracy = train_and_predict(end_users)
+    df, accuracy = train_and_predict(end_users, current_user.id)
     logger.info("Churn predictions generated for user_id=%s (model_accuracy=%.3f)", current_user.id, accuracy)
 
     predictions = [
@@ -46,15 +46,26 @@ def get_churn_predictions(
         for _, row in df.iterrows()
     ]
 
-    # Persist latest predictions for historical tracking
+    # Persist latest predictions for historical tracking (upsert pattern)
+    from datetime import datetime
     for _, row in df.iterrows():
-        db.add(
-            models.Prediction(
-                end_user_id=int(row["id"]),
-                churn_probability=float(row["churn_probability"]),
-                risk_level=row["risk_level"],
+        user_id = int(row["id"])
+        prob = float(row["churn_probability"])
+        risk = row["risk_level"]
+        
+        existing_pred = db.query(models.Prediction).filter(models.Prediction.end_user_id == user_id).first()
+        if existing_pred:
+            existing_pred.churn_probability = prob
+            existing_pred.risk_level = risk
+            existing_pred.predicted_at = datetime.utcnow()
+        else:
+            db.add(
+                models.Prediction(
+                    end_user_id=user_id,
+                    churn_probability=prob,
+                    risk_level=risk,
+                )
             )
-        )
     db.commit()
 
     high = sum(1 for p in predictions if p.risk_level == "High")

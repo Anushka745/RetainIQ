@@ -4,3 +4,7 @@ frontend/venv/
 __pycache__/
 *.pyc
 retainiq.db
+
+# Environments
+.env
+.env.*

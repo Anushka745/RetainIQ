@@ -38,9 +38,16 @@ app = FastAPI(
 )
 
 # CORS: allow the Streamlit frontend (and local dev origins) to call this API.
+import os
+cors_origins_raw = os.getenv("CORS_ALLOWED_ORIGINS", "*")
+if cors_origins_raw == "*":
+    allow_origins = ["*"]
+else:
+    allow_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to your frontend's exact origin(s).
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
