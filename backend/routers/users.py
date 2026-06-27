@@ -104,4 +104,8 @@ def upload_users_csv(
     db.commit()
     logger.info("CSV upload by user_id=%s imported %d rows", current_user.id, rows_imported)
 
+    # Invalidate cache since new user data has been uploaded
+    from services.cache_manager import invalidate_churn_cache
+    invalidate_churn_cache(current_user.id)
+
     return schemas.UploadResponse(message="Upload successful", rows_imported=rows_imported)

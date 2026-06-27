@@ -33,15 +33,17 @@ def get_insights(
     general_rate_limiter.check(get_client_key(request))
 
     end_users = db.query(models.EndUser).filter(models.EndUser.owner_id == current_user.id).all()
-    end_user_ids = [u.id for u in end_users]
     events = (
-        db.query(models.Event).filter(models.Event.end_user_id.in_(end_user_ids)).all() if end_user_ids else []
+        db.query(models.Event)
+        .join(models.EndUser, models.Event.end_user_id == models.EndUser.id)
+        .filter(models.EndUser.owner_id == current_user.id)
+        .all()
     )
 
     if not end_users:
         return schemas.InsightsResponse(insights=[])
 
-    churn_df, _ = train_and_predict(end_users)
+    churn_df, _ = train_and_predict(end_users, current_user.id)
     funnel_stages = compute_funnel(events)
     segment_all(end_users)
     db.commit()

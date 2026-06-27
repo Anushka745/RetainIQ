@@ -27,11 +27,11 @@ def get_funnel(
 ):
     general_rate_limiter.check(get_client_key(request))
 
-    end_user_ids = [
-        u.id for u in db.query(models.EndUser.id).filter(models.EndUser.owner_id == current_user.id).all()
-    ]
     events = (
-        db.query(models.Event).filter(models.Event.end_user_id.in_(end_user_ids)).all() if end_user_ids else []
+        db.query(models.Event)
+        .join(models.EndUser, models.Event.end_user_id == models.EndUser.id)
+        .filter(models.EndUser.owner_id == current_user.id)
+        .all()
     )
 
     stages = compute_funnel(events)

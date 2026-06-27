@@ -53,15 +53,25 @@ def _build_feature_frame(end_users: List[models.EndUser]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def train_and_predict(end_users: List[models.EndUser]) -> Tuple[pd.DataFrame, float]:
+from services.cache_manager import get_cached_churn, set_cached_churn
+
+def train_and_predict(end_users: List[models.EndUser], owner_id: int = None) -> Tuple[pd.DataFrame, float]:
     """
     Trains a RandomForestClassifier on the provided end-user population and
     returns a DataFrame with churn_probability and risk_level for every user,
     plus the model's holdout accuracy (for logging/diagnostics).
     """
+    if owner_id is not None:
+        cached = get_cached_churn(owner_id)
+        if cached is not None:
+            return cached
+
     if len(end_users) < 10:
         # Not enough data to train meaningfully; fall back to heuristic scoring.
-        return _heuristic_predict(end_users), 0.0
+        res = _heuristic_predict(end_users), 0.0
+        if owner_id is not None:
+            set_cached_churn(owner_id, res[0], res[1])
+        return res
 
     df = _build_feature_frame(end_users)
     X = df[FEATURE_COLUMNS]
@@ -83,6 +93,10 @@ def train_and_predict(end_users: List[models.EndUser]) -> Tuple[pd.DataFrame, fl
 
     df["risk_level"] = df["churn_probability"].apply(_risk_bucket)
     logger.info("Churn model trained. Holdout accuracy=%.3f, n_users=%d", accuracy, len(df))
+
+    if owner_id is not None:
+        set_cached_churn(owner_id, df, accuracy)
+
     return df, accuracy
 
 
